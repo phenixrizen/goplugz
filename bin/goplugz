@@ -1,0 +1,71 @@
+#!/bin/zsh
+
+if ! type "godoc" > /dev/null; then
+  # install godoc if not installed
+    go install http://golang.org/x/tools/...@latest
+fi
+
+_open=""
+if [ "$(uname)" == "Darwin" ]; then
+    # Mac OS
+    _open="open" 
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    # Linux
+    _open="xdg-open"
+fi
+
+alias www='python2 -m SimpleHTTPServer'
+
+# gocover is a helper function that launches a browser with a go test coverage report
+alias gocover=_gocover
+function _gocover(){
+    pkg=${PWD##*/}
+    pkgdir=${PWD}
+    tmpdir=$(dirname $(mktemp -u))
+    echo "===> Running go test coverage tools: "
+    echo ""
+    go test -v -coverprofile $tmpdir/$pkg.coverage.out ./... || { echo ""; echo "======> Go Tests Failed"; return 1; }
+    echo ""
+    echo "===> Generating go test coverage report: "
+    echo ""
+    go tool cover -html=$tmpdir/$pkg.coverage.out -o $tmpdir/$pkg.coverage.htm || { echo ""; echo "======> Go Coverage Reports Failed"; return 1; }
+    cd $tmpdir && www > /dev/null 2>&1 &
+    wwwpid=$!
+    cd $pkgdir
+    echo ""
+    echo "===> Opening coverage report: "
+    echo ""
+    _open "http://localhost:8000/$PKG.coverage.htm"
+     echo "===> Type Q to kill www server"
+    while read -k1 key
+    do
+      if [ "$key" = "Q" ];
+      then
+      kill -9 $wwwpid
+      break
+      fi
+    done
+}
+
+alias gdoc=_godoc
+function _godoc(){
+    gomod=$( go env | grep GOMOD= | cut -d'"' -f2)
+    pkg=$(sed 1q ${gomod} | awk '{print $2}')
+    echo "===> Generating godoc for $PKG"
+    godoc -http=:6060  > /dev/null 2>&1 &
+    godocpid=$!
+    echo ""
+    url="http://localhost:6060/pkg/$pkg"
+    echo "===> Opening go doc: $url"
+    echo ""
+    _open $url
+    echo "===> Type Q to kill godoc"
+    while read -k1 key
+    do
+      if [ "$key" = "Q" ];
+      then
+      kill -9 $godocpid
+      break
+      fi
+    done
+}
